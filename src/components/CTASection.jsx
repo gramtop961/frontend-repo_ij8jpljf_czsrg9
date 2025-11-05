@@ -1,7 +1,47 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Heart, Sparkles } from 'lucide-react';
 
 export default function CTASection() {
+  const [url, setUrl] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [roomId, setRoomId] = useState('');
+
+  const backend = import.meta.env.VITE_BACKEND_URL;
+
+  const handleCreate = async () => {
+    setError('');
+    setRoomId('');
+    if (!url || !/^https?:\/\//.test(url)) {
+      setError('Please paste a valid YouTube URL.');
+      return;
+    }
+    if (!backend) {
+      setError('Backend URL is not configured.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch(`${backend}/rooms`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ youtube_url: url }),
+      });
+      if (!res.ok) {
+        const t = await res.text();
+        throw new Error(t || 'Failed to create room');
+      }
+      const data = await res.json();
+      setRoomId(data.room_id);
+    } catch (e) {
+      setError(e.message || 'Something went wrong creating the room');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const shareUrl = roomId ? `${window.location.origin}/room/${roomId}` : '';
+
   return (
     <section className="relative isolate overflow-hidden bg-[#0b0b12] py-20 text-white">
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-pink-500/10 via-fuchsia-500/10 to-indigo-500/10" />
@@ -21,14 +61,39 @@ export default function CTASection() {
         <div className="mx-auto mt-8 flex max-w-md flex-col items-center gap-3 sm:flex-row">
           <input
             type="text"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
             placeholder="Paste a YouTube URL"
             className="w-full flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-white/50 outline-none ring-0 backdrop-blur focus:border-pink-400/50"
           />
-          <button className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-pink-500 to-fuchsia-500 px-6 py-3 font-semibold text-white shadow-lg shadow-pink-500/30 transition hover:scale-[1.01] sm:w-auto">
+          <button
+            onClick={handleCreate}
+            disabled={loading}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-pink-500 to-fuchsia-500 px-6 py-3 font-semibold text-white shadow-lg shadow-pink-500/30 transition hover:scale-[1.01] disabled:opacity-60 sm:w-auto"
+          >
             <Heart className="h-5 w-5" />
-            Create Room
+            {loading ? 'Creating…' : 'Create Room'}
           </button>
         </div>
+
+        {error && (
+          <div className="mt-4 text-sm text-rose-300">{error}</div>
+        )}
+
+        {roomId && (
+          <div className="mt-6 rounded-xl border border-pink-500/30 bg-pink-500/10 p-4 text-left">
+            <div className="text-pink-200">Room created!</div>
+            <div className="mt-1 break-all text-white/90">
+              Share this link with your partner:
+            </div>
+            <a
+              href={shareUrl}
+              className="mt-2 block truncate text-pink-300 underline"
+            >
+              {shareUrl}
+            </a>
+          </div>
+        )}
       </div>
     </section>
   );
